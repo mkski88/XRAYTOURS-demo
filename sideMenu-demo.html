@@ -1,0 +1,414 @@
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css">
+<div id="sidePanel">
+  <button id="closeBtn"><i class="fas fa-times"></i></button>
+  <img id="modelImage" src="" alt="Model Image">
+  <h2 id="modelName">Назва Мадэлі</h2>
+  <h7 id="warning">*Тэкст згенераваны з дапамогай ChatGPT і можа ўтрымліваць граматычныя і сэнсоўныя памылкі*</h7>
+  <div id="modelInfo">
+    <p id="up"></p>
+    <p id="down"></p>
+  </div>
+  <div id="tour">
+    <a id="goLocationArButton" class="button"><i class="fas fa-cube"></i> Location AR</a>
+    <a id="goMarkerArButton" class="button"><i class="fas fa-crosshairs"></i> Marker AR</a>
+    <a id="goVrButton" class="button"><i class="fas fa-vr-cardboard"></i> Go VR</a>
+  </div>
+  <div id="index">
+    <a id="tourButton" class="button"><i class="fa-solid fa-location-dot"></i> Start tour</a>
+  </div>
+</div>
+<!-- ejs module conection -->
+<%- include('popup') %>
+<style>
+  #warning {
+    font-size: 10px;
+    font-weight: 300;
+    display: block;
+
+  }
+  .Info-loader {
+    border: 2px solid #f4e8e1;
+    border-top: 2px solid #a2836e;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    animation: spin 2s linear infinite;
+  }
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  @media (max-width: 768px) {
+    #sidePanel {
+      width: 100%;
+      right: -100%;
+    }
+
+    #sidePanel.open {
+      right: 0;
+    }
+
+    #sidePanel #closeBtn {
+      font-size: 24px;
+      padding: 12px;
+    }
+  }
+  body, html {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
+  }
+  #sidePanel {
+    width: 300px;
+    background-color: #f4e8e1;
+    box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.3);
+    padding: 15px;
+    color: #5a3e36;
+    z-index: 998;
+    box-sizing: border-box;
+    position: fixed;
+    top: 0;
+    right: -350px;
+    height: 100%!important;
+    overflow-y: auto;
+    transition: right 0.5s ease;
+
+  }
+  body.locked {
+    overflow: hidden;
+  }
+  #sidePanel.open {
+    right: 0;
+  }
+  #sidePanel h2 {
+    color: #5a3e36;
+    font-size: 24px;
+    font-weight: 600;
+    margin-bottom: 20px;
+  }
+  #sidePanel #modelImage {
+    border-radius: 8px;
+    margin-bottom: 20px;
+    object-position: center;
+    filter: drop-shadow(0 0 20px rgba(0, 0, 0, 0.5));
+  }
+  .cityImage{
+    height: 250px;
+    display: block;
+    margin-left: auto;
+    margin-right: auto
+  }
+  .buildingImage {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+  }
+  #sidePanel .button {
+    display: block;
+    width: calc(100% - 50px);
+    padding: 10px 20px;
+    margin-bottom: 25px;
+    text-align: center;
+    background-color: #a2836e;
+    color: white;
+    text-decoration: none;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.3s, box-shadow 0.3s;
+    box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.3);
+  }
+  #sidePanel .button:hover {
+    background-color: black;
+  }
+  #sidePanel #closeBtn {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    font-size: 20px;
+    color: #5a3e36;
+    background: none;
+    border: none;
+    padding: 8px;
+    cursor: pointer;
+    z-index: 9999;
+  }
+  #sidePanel #closeBtn:hover {
+    color: #3e2c28;
+  }
+  #modelInfo {
+    color: #7a5a4f;
+    line-height: 1.6;
+    margin-bottom: 20px;
+  }
+  #sidePanel a.button {
+    text-decoration: none;
+    color: white;
+  }
+</style>
+<script>
+  let type = window.location.pathname; //Determine the current page type from the URL
+  let infoTypes = []; //Array to store information types
+  let infoArr = []; //Array to store information related to the model
+  let typeWriterTimers = {}; //Object to track typewriter effect timers
+
+  //Set up panel content based on the type of model (city or building)
+  if(type == '/' || type == '/menu') {
+    document.getElementById('modelImage').classList.add('cityImage'); //Add class for image
+    document.getElementById('tour').style.display = 'none'; //Hide AR/VR buttons for city page
+    document.getElementById('up').innerHTML='<i class="fas fa-book"></i> <strong>Гісторыя:</strong> <span id="modelStyle">-</span>'
+    document.getElementById('down').innerHTML='<i class="fas fa-users"></i> <strong>Насельніцтва:</strong> <span id="modelYear">-</span>'
+
+    infoTypes = ['text','population'] //Set types for city
+    type = 'city'
+  }
+  else {
+    document.getElementById('modelImage').classList.add('buildingImage') //Add class for image
+    document.getElementById('index').style.display = 'none'; //Hide Start tour button for buildings
+    document.getElementById('warning').style.display = 'none'; //Hide warning for buildings
+    document.getElementById('up').innerHTML='<i class="fas fa-drafting-compass"></i> <strong>Архітэктурныя стылі:</strong> <span id="modelStyle">-</span>'
+    document.getElementById('down').innerHTML='<i class="fas fa-hourglass-half"></i> <strong>Час пабудовы:</strong> <span id="modelYear">-</span>'
+
+    infoTypes = ['time','style'] //Set types for building
+    type = 'building'
+  }
+  function typeWriter(containerId, text, name) {
+    const container = document.getElementById(containerId);
+
+    //Typewriter effect runs only for the correct building or city
+    if (document.getElementById('modelName').textContent !== name) {
+      container.innerHTML = "<div class='Info-loader'></div>";
+      return;
+    }
+    let i = 0;
+    //Clear typewriter timers
+    if (typeWriterTimers[containerId]) {
+      clearTimeout(typeWriterTimers[containerId]);
+      container.innerHTML = '';
+    }
+    //Function for typing the text symbol by symbol
+    function typing() {
+      if (i < text.length) {
+        container.innerHTML += text.charAt(i);
+        i++;
+        typeWriterTimers[containerId] = setTimeout(typing, 10);
+      }
+    }
+    typing();
+  }
+  //Function to stop all active typewriters
+  async function stopAllTypeWriters() {
+    for (const containerId in typeWriterTimers) {
+      if (typeWriterTimers.hasOwnProperty(containerId)) {
+        clearTimeout(typeWriterTimers[containerId]);
+        delete typeWriterTimers[containerId];
+        const container = document.getElementById(containerId);
+        if (container) {
+          container.innerHTML = '';
+        }
+      }
+    }
+  }
+
+  //Capitalize first letter and remove trailing commas
+  function formatString(str) {
+    if (!str) return str;
+    str = str.charAt(0).toUpperCase() + str.slice(1);
+    if (str.endsWith(',') || str.endsWith(' ') || str.endsWith(', ')) {
+      str = str.slice(0, str.length - (str.endsWith(', ') ? 2 : 1));
+    }
+    return str;
+  }
+  function isSameModel(name) {
+    return document.getElementById('modelName').textContent === name;
+  }
+  function closeSidePanel() {
+    document.getElementById("sidePanel").classList.remove("open");
+  }
+
+  //Function to check if user have access to AR/VR content and show popups based on their balance
+  async function checkAllowed(type, url, price) {
+    let typeText = type === 'marker-AR' ? 'AR' : type;
+
+    const coins = await getCoins(); //Get user's current coin balance
+    const balanceDeclension = getTalerDeclension(coins); //Get correct declension for coins
+    const priceDeclension = getTalerDeclension(price); //Get correct declension for the price
+    const only = coins === 0 ? '' : 'толькі '; //Determine if the user has 0 coins
+
+    if (coins < 0) {
+      showPopup(
+              "Патрабуецца аўтэнтыфікацыя",
+              "Вы не ўвайшлі ў свой аккаўнт. Калі ласка, увайдзіце для працягу.",
+              "Увайсьці <i class='fas fa-sign-in-alt'></i>",
+              authenticateUser
+      );
+    } else if (coins < price) {
+      showPopup(
+              "Недастаткова талераў!",
+              `У вас засталося ${only}<strong>${coins}</strong> ${balanceDeclension}, а для прагляду мадэлі патрабуецца <strong>${price}</strong> ${priceDeclension}.`,
+              "Атрымаць талеры <i class='fas fa-coins'></i>",
+              () => redirectTo('/coins')
+      );
+    } else {
+      showPopup(
+              `Пачаць ${typeText} тур?`,
+              `Прагляд гэтай мадэлі будзе каштаваць <strong>${price}</strong> ${priceDeclension}.`,
+              "Так <i class='fas fa-check'></i>",
+              () => redirectTo(`/${type}${url}`)
+      );
+    }
+  }
+
+  //Function to store information from GPT
+  function setInfo(name, value) {
+    infoArr.push({name:name,value:value})
+  }
+  //Function to get stored information by name
+  function getInfo(name) {
+    for (let item of infoArr) {
+      if (item.name === name) {
+        return item.value;
+      }
+    }
+    return undefined;
+  }
+  function getAllInfo() {
+    return infoArr
+  }
+  function deleteInfo(name) {
+    infoArr = infoArr.filter(item => item.name !== name);
+  }
+
+  //Function to open the side panel and display building or city information
+  async function openSidePanel(imageUrl, name, info, Url, price) {
+    await stopAllTypeWriters(); //Stop any ongoing typewriters
+
+    price = price ?? 1; //Set up default price
+    Url = Url.replace('/view-model', '');
+
+    const sidePanel = document.getElementById("sidePanel");
+    const isPanelOpen = sidePanel.classList.contains("open");
+
+    const modelImage = document.getElementById("modelImage");
+    const modelName = document.getElementById("modelName");
+    const modelStyle = document.getElementById("modelStyle");
+    const modelYear = document.getElementById("modelYear");
+
+    //Function to update the panel data
+    async function updateData() {
+      modelImage.src = imageUrl;
+      modelName.textContent = name;
+      modelStyle.innerHTML = "<div class='Info-loader'></div>";
+      modelYear.innerHTML = "<div class='Info-loader'></div>";
+
+      document.getElementById("goLocationArButton").onclick = () => checkAllowed('AR', Url, price);
+      document.getElementById("goMarkerArButton").onclick = () => checkAllowed('marker-AR', Url, price);
+      document.getElementById("goVrButton").onclick = () => checkAllowed('VR', Url, price + 1);
+      document.getElementById("tourButton").onclick = () => openCityPage(name);
+
+      const infoKey1 = `${name}-${getCityFromUrl()}-${infoTypes[1]}`;
+      const infoKey2 = `${name}-${getCityFromUrl()}-${infoTypes[0]}`;
+
+      //Check if the information is already saved
+      if (getInfo(infoKey2) == null) {
+        const allInfo = getAllInfo();
+        if (allInfo.length > 7) {
+          deleteInfo(allInfo[0]);
+          deleteInfo(allInfo[1]);
+        }
+
+        if (window.isFetching && window.location.pathname != '/tour') {
+          console.log('Fetch operation is already in progress.');
+          return;
+        }
+        window.isFetching = true;
+        //Call to chatGPT to get information for city or building
+        try {
+          const response = await fetch('/ask', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ title: info, type: type, lang:getLang(), titleL: toLatin(name) })
+          });
+
+          const data = await response.json();
+          const temp = data.reply;
+
+          //Update side menu with fetched information
+          if (type === 'city') {
+            const c1 = formatString(temp.text);
+            const c2 = formatString(temp.population);
+            setInfo(infoKey1, c1, 2);
+            setInfo(infoKey2, c2, 2);
+            modelStyle.innerHTML = "<br>";
+            typeWriter("modelStyle", c1, name);
+            modelYear.innerHTML = "<br>";
+            typeWriter("modelYear", c2, name);
+          } else {
+            const c1 = formatString(temp.style);
+            const c2 = formatString(temp.time);
+            setInfo(infoKey1, c1, 2);
+            setInfo(infoKey2, c2, 2);
+            modelStyle.innerHTML = "<br>";
+            typeWriter("modelStyle", c1, name);
+            modelYear.innerHTML = "<br>";
+            typeWriter("modelYear", c2, name);
+          }
+        } catch (error) {
+          console.error('Fetch failed:', error);
+        } finally {
+          window.isFetching = false;
+        }
+      } else {
+        const c1 = getInfo(infoKey1);
+        const c2 = getInfo(infoKey2);
+        modelStyle.innerHTML = `<br>${c1}`;
+        modelYear.innerHTML = `<br>${c2}`;
+      }
+    }
+
+    //If the panel is already open with a different model, close and reopen it
+    if (isPanelOpen && !isSameModel(name)) {
+      sidePanel.classList.remove("open");
+      setTimeout(() => {
+        updateData();
+        sidePanel.classList.add("open");
+      }, 300);
+    } else {
+      updateData();
+      sidePanel.classList.add("open");
+    }
+  }
+
+
+  document.getElementById("closeBtn").addEventListener("click", closeSidePanel);
+  document.addEventListener('DOMContentLoaded', function() {
+    let startTouchX = null;
+    let sidePanel = document.getElementById('sidePanel');
+
+    sidePanel.addEventListener('touchstart', function(e) {
+      startTouchX = e.touches[0].pageX;
+    }, false);
+
+    sidePanel.addEventListener('touchmove', function(e) {
+      if (startTouchX === null) {
+        return;
+      }
+
+      let currentTouchX = e.touches[0].pageX;
+      let diffX = startTouchX - currentTouchX;
+
+      // Close the side panel if swiped right
+      if (diffX < -50) {
+        sidePanel.classList.remove('open');
+        startTouchX = null;
+      }
+    }, false);
+
+    sidePanel.addEventListener('touchend', function(e) {
+      startTouchX = null;
+    }, false);
+  });
+</script>
